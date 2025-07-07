@@ -1,29 +1,17 @@
 import streamlit as st
 import fitz  # PyMuPDF
-import requests
 import io
 from PIL import Image
 
 st.set_page_config(page_title="Ekstrak Gambar dari PDF", layout="wide")
 st.title("📄🔍 Ekstraksi Gambar dari PDF Koran Lama")
 
-# Contoh URL default
-default_url = "https://opac.perpusnas.go.id/uploaded_files/dokumen_isi3/Terbitan%20Berkala/CHERIBONSCHE_COURANT_1925_08_19_001.pdf"
-pdf_url = st.text_input("Masukkan URL PDF:", value=default_url)
+uploaded_file = st.file_uploader("Unggah file PDF koran lama", type="pdf")
 
-if st.button("Proses PDF"):
+if uploaded_file is not None:
     try:
-        st.info("Mengunduh PDF dari URL...")
-        #response = requests.get(pdf_url)
-        headers = {
-            "User-Agent": "Mozilla/5.0",  # menyamar jadi browser
-            "Referer": "https://opac.perpusnas.go.id"  # kadang perlu ini juga
-        }
-        response = requests.get(pdf_url, headers=headers)
-        response.raise_for_status()
-
-        doc = fitz.open(stream=response.content, filetype="pdf")
-        st.success(f"PDF berhasil dimuat. Total halaman: {len(doc)}")
+        st.success("PDF berhasil diunggah.")
+        doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
 
         image_count = 0
 
@@ -42,7 +30,6 @@ if st.button("Proses PDF"):
                 image = Image.open(io.BytesIO(image_bytes))
                 st.image(image, caption=f"Gambar {image_count + 1} (halaman {page_num + 1})", use_column_width=True)
 
-                # Tombol unduh
                 st.download_button(
                     label="💾 Unduh gambar ini",
                     data=image_bytes,
@@ -53,7 +40,7 @@ if st.button("Proses PDF"):
                 image_count += 1
 
         if image_count == 0:
-            st.warning("Tidak ditemukan gambar dalam PDF ini.")
+            st.warning("Tidak ditemukan gambar dalam PDF.")
         else:
             st.success(f"Total gambar ditemukan: {image_count}")
 
