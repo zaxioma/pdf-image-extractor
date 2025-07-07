@@ -1,48 +1,52 @@
 import streamlit as st
-import fitz  # PyMuPDF
-import io
+from pdf2image import convert_from_bytes
 from PIL import Image
+import numpy as np
+import cv2
+import io
 
-st.set_page_config(page_title="Ekstrak Gambar dari PDF", layout="wide")
-st.title("📄🔍 Ekstraksi Gambar dari PDF Koran Lama")
+st.set_page_config(page_title="Segmentasi Gambar dari PDF Koran", layout="wide")
+st.title("📰📸 Segmentasi Gambar Otomatis dari PDF Koran Lama")
 
-uploaded_file = st.file_uploader("Unggah file PDF koran lama", type="pdf")
+uploaded_file = st.file_uploader("Unggah PDF hasil scan koran lama", type="pdf")
 
-if uploaded_file is not None:
-    try:
-        st.success("PDF berhasil diunggah.")
-        doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+MIN_WIDTH = 100
+MIN_HEIGHT = 100
 
-        image_count = 0
+if uploaded_file:
+    with st.spinner("Mengonversi halaman PDF ke gambar..."):
+        pages = convert_from_bytes(uploaded_file.read(), dpi=300)
 
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            images = page.get_images(full=True)
+    st.success(f"{len(pages)} halaman berhasil dikonversi.")
 
-            if images:
-                st.subheader(f"Halaman {page_num + 1}")
-            for img_index, img in enumerate(images):
-                xref = img[0]
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-                image_ext = base_image["ext"]
+    for page_num, page_image in enumerate(pages):
+        st.subheader(f"🧾 Halaman {page_num + 1}")
+        st.image(page_image, caption="Gambar Halaman Penuh", use_column_width=True)
 
-                image = Image.open(io.BytesIO(image_bytes))
-                st.image(image, caption=f"Gambar {image_count + 1} (halaman {page_num + 1})", use_column_width=True)
+        # Convert PIL image to OpenCV format
+        img_gray = np.array(page_image.convert("L"))
+        _, thresh = cv2.threshold(img_gray, 200, 255, cv2.THRESH_BINARY_INV)
 
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        segmen_ke = 0
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+            if w > MIN_WIDTH and h > MIN_HEIGHT:
+                cropped = page_image.crop((x, y, x + w, y + h))
+                st.image(cropped, caption=f"🧩 Segmen {segmen_ke + 1} (WxH: {w}x{h})", use_column_width=True)
+
+                # Tombol unduh tiap segmen
+                img_bytes = io.BytesIO()
+                cropped.save(img_bytes, format="PNG")
                 st.download_button(
-                    label="💾 Unduh gambar ini",
-                    data=image_bytes,
-                    file_name=f"halaman_{page_num+1}_gambar_{img_index+1}.{image_ext}",
-                    mime=f"image/{image_ext}"
+                    label=f"💾 Unduh Segmen {segmen_ke + 1}",
+                    data=img_bytes.getvalue(),
+                    file_name=f"halaman_{page_num + 1}_segmen_{segmen_ke + 1}.png",
+                    mime="image/png"
                 )
 
-                image_count += 1
+                segmen_ke += 1
 
-        if image_count == 0:
-            st.warning("Tidak ditemukan gambar dalam PDF.")
-        else:
-            st.success(f"Total gambar ditemukan: {image_count}")
-
-    except Exception as e:
-        st.error(f"Terjadi kesalahan: {e}")
+        if segmen_ke == 0:
+            st.warning("Tidak ada blok gambar cukup besar terdeteksi pada halaman ini.")
