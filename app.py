@@ -22,8 +22,6 @@ if st.button("Proses PDF"):
         response = requests.get(pdf_url, headers=headers)
         response.raise_for_status()
 
-        response.raise_for_status()
-
         doc = fitz.open(stream=response.content, filetype="pdf")
         st.success(f"PDF berhasil dimuat. Total halaman: {len(doc)}")
 
