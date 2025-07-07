@@ -14,7 +14,14 @@ pdf_url = st.text_input("Masukkan URL PDF:", value=default_url)
 if st.button("Proses PDF"):
     try:
         st.info("Mengunduh PDF dari URL...")
-        response = requests.get(pdf_url)
+        #response = requests.get(pdf_url)
+        headers = {
+            "User-Agent": "Mozilla/5.0",  # menyamar jadi browser
+            "Referer": "https://opac.perpusnas.go.id"  # kadang perlu ini juga
+        }
+        response = requests.get(pdf_url, headers=headers)
+        response.raise_for_status()
+
         response.raise_for_status()
 
         doc = fitz.open(stream=response.content, filetype="pdf")
